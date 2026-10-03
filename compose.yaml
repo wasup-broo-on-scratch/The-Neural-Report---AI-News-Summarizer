@@ -1,0 +1,67 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    pull_policy: missing
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    expose:
+      - "11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 20s
+
+  ollama-model-init:
+    image: ollama/ollama:latest
+    pull_policy: missing
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["ollama pull \"$OLLAMA_MODEL\""]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:30b}
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  ai:
+    build:
+      context: ./ai_service
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      AI_PORT: "8788"
+      OLLAMA_URL: http://ollama:11434
+    expose:
+      - "8788"
+    depends_on:
+      ollama-model-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8788/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PORT: "8787"
+      AI_SERVICE_URL: http://ai:8788
+    ports:
+      - "${API_PORT:-8787}:8787"
+    depends_on:
+      ai:
+        condition: service_healthy
+
+volumes:
+  ollama_data:

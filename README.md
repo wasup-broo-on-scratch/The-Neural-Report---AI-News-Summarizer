@@ -4,15 +4,17 @@ The Neural Report gathers current AI coverage from external publisher RSS feeds 
 
 ## Local setup
 
-Requirements: Node.js 20 or newer and npm. Ollama is optional.
+Requirements: Node.js 20 or newer, Python 3.10 or newer, and npm. Ollama is optional for browsing.
 
 ```sh
 npm install
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
 cp .env.example .env
 npm run dev
 ```
 
-Open `http://localhost:5173`. Vite serves the React frontend and proxies `/api` requests to the Express API on port 8787. The initial feed loads from configured publisher RSS feeds; searches also query Google News RSS. Feed results are cached in memory for five minutes. If some feeds fail, working sources still appear and the page reports source errors; there are no sample-story fallbacks.
+Open `http://localhost:5173`. `npm run dev` starts three services: Vite on port 5173, the Express RSS/search API on port 8787, and the Flask AI service on port 8788. Express proxies AI requests to Flask; Flask calls Ollama at `OLLAMA_URL`. News browsing works without Ollama, but summaries and chat require Ollama and the configured model to be available. The initial feed loads from configured publisher RSS feeds; searches also query Google News RSS. Feed results are cached in memory for five minutes. If some feeds fail, working sources still appear and the page reports source errors; there are no sample-story fallbacks.
 
 ## News sources
 
@@ -24,16 +26,16 @@ NEWS_FEEDS=Publisher One|https://publisher.example/feed.xml,Publisher Two|https:
 
 The query provider is Google News RSS and requires no API key. RSS items are normalized, categorized, deduplicated, and linked to their reported publisher/article URL. The service fetches feed metadata only; it does not scrape or reproduce article bodies. In-memory RSS and search caches expire after five minutes.
 
-## Optional Ollama summaries
+## AI summaries and chat
 
-Install and run Ollama separately, then pull one of the supported models yourself. The app never downloads a model automatically.
+The Flask service handles AI readiness, single-article briefs, feed summaries, and chat grounded in the currently retrieved articles. It cites only publisher URLs from that feed. Ollama is a separate runtime; install and run it where Flask can reach it, then pull a supported model explicitly. The app never downloads a model automatically.
 
 ```sh
 ollama serve
 ollama pull qwen3:30b
 ```
 
-Set `OLLAMA_URL` and `OLLAMA_MODEL` in `.env`. Supported suggested values are `qwen3:30b` (default), `gemma3:12b`, and `llama3.3:70b`. Open a story brief and choose **Generate AI brief**. Only the retrieved headline, publisher, date, excerpt, and category are sent to Ollama. The response includes an AI-labeled summary, key points, cautious significance, category, topics, and entities. Summaries are cached in memory for 24 hours. If Ollama is offline, browsing and external search remain available.
+Set `AI_SERVICE_URL`, `OLLAMA_URL`, and `OLLAMA_MODEL` in `.env`. Suggested quality models are `qwen3:30b` (default) and `llama3.3:70b`; `gemma3:12b` is the lower-resource option. Strong, fast inference requires a GPU-backed Ollama host with enough VRAM for the chosen model; this Codespace has no GPU and cannot serve 30B/70B models quickly. Point `OLLAMA_URL` to that host from Flask. `OLLAMA_KEEP_ALIVE=30m` avoids repeated cold starts, while `OLLAMA_NUM_CTX` and `OLLAMA_NUM_PREDICT` bound context and response length. Open a story and choose **Generate AI brief**, choose **Summarize Articles With AI**, or use **Ask AI** in the header to chat about the loaded news. Chat answers are constrained to retrieved headlines and publisher excerpts; article links are attached from trusted feed metadata. Responses are labeled AI-generated. Summary caches expire after 24 hours. If Ollama is offline or the model is missing, the readiness indicator and AI controls report that; news browsing still works.
 
 ## Deployment
 
@@ -43,9 +45,24 @@ Build and deploy the static frontend from the repository root. Configure the Pag
 
 ### API and Ollama host
 
-Run the Node API on a server/container host that can access the configured RSS sources. Build the included container with `docker build -t neural-report-api .` and run it with port 8787 exposed. Configure `FRONTEND_ORIGIN` to the Pages site origin, along with `OLLAMA_URL`, `OLLAMA_MODEL`, and optional `NEWS_FEEDS`. Ollama should run on a machine reachable by that API; Cloudflare Pages does not run Ollama. Keep any provider credentials server-side if you add a credentialed search provider later.
+Deploy the Express API, Flask AI service, and Ollama together on a persistent server. The included `compose.yaml` sets `restart: unless-stopped` and stores Ollama models in a named volume, so services return after a host/Docker restart and downloaded models persist.
 
-The API exposes `GET /api/health`, `GET /api/news`, and `POST /api/summarize`. There are no API keys in frontend code.
+```sh
+cp .env.example .env
+# Set FRONTEND_ORIGIN to the Cloudflare Pages site URL.
+docker compose up -d --build
+docker compose logs -f
+```
+
+Compose automatically pulls the configured model once on first startup, then waits for it before starting Flask and the API. The model is stored in the persistent Ollama volume and is not downloaded again on ordinary restarts. The initial download can be large and depends on your model and network. For an NVIDIA GPU host with NVIDIA Container Toolkit installed, start the GPU override instead:
+
+```sh
+docker compose -f compose.yaml -f compose.gpu.yaml up -d --build
+```
+
+Use `docker compose down` to stop the app; the Ollama model volume is retained. Set Pages' `VITE_API_BASE_URL` to the public Express API URL. Cloudflare Pages hosts only the frontend; it cannot run the API, Flask, or Ollama. Choose a host with enough GPU memory for the configured model if low-latency 30B/70B inference is required. Keep any provider credentials server-side if you add a credentialed search provider later.
+
+The Express API exposes `GET /api/health`, `GET /api/news`, `POST /api/summarize`, `POST /api/summarize-feed`, and `POST /api/chat`. The Flask service exposes matching AI routes and its own `GET /health`. There are no API keys in frontend code.
 
 ## Checks
 

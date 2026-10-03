@@ -1,0 +1,10 @@
+node_modules
+.venv
+__pycache__
+*.py[cod]
+.env
+.git
+dist
+ai_service
+compose*.yaml
+README.md

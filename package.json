@@ -4,12 +4,14 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k \"npm:dev:api\" \"npm:dev:web\"",
+    "dev": "concurrently -k \"npm:dev:api\" \"npm:dev:web\" \"npm:dev:ai\"",
     "dev:api": "node --watch server/index.js",
     "dev:web": "vite --host 0.0.0.0",
+    "dev:ai": ".venv/bin/python ai_service/app.py",
     "build": "vite build",
     "start": "node server/index.js",
-    "test": "node --test server/*.test.js",
+    "test:ai": ".venv/bin/python -m unittest discover -s ai_service -p 'test_*.py'",
+    "test": "node --test server/*.test.js && npm run test:ai",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
