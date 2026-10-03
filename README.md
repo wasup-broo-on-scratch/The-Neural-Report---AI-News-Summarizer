@@ -41,7 +41,7 @@ Set `AI_SERVICE_URL`, `OLLAMA_URL`, and `OLLAMA_MODEL` in `.env`. Suggested qual
 
 ### Cloudflare Pages frontend
 
-Build and deploy the static frontend from the repository root. Configure the Pages build command as `npm run build` and output directory as `dist`. Set the Pages environment variable `VITE_API_BASE_URL` to the public origin of the separately hosted API, for example `https://news-api.example.com`. Vite embeds this public base URL at build time; do not put secrets in `VITE_*` variables.
+Build and deploy the static frontend from the repository root. Configure the Pages build command as `npm run build` and output directory as `dist`. If your Cloudflare setup uses a custom deploy command, set it to `npm run deploy:pages` (or `npx wrangler pages deploy ./dist --project-name=the-neural-report`). Do **not** use `npx wrangler deploy`; that deploys a Worker and produces the “Missing entry-point to Worker script or to assets directory” error for this Pages app. With normal Pages Git integration, leave the custom deploy command unset and let Pages publish the configured `dist` output. Set the Pages environment variable `VITE_API_BASE_URL` to the public origin of the separately hosted API, for example `https://news-api.example.com`. Vite embeds this public base URL at build time; do not put secrets in `VITE_*` variables.
 
 ### API and Ollama host
 

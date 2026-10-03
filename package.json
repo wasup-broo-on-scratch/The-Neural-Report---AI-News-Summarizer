@@ -9,6 +9,7 @@
     "dev:web": "vite --host 0.0.0.0",
     "dev:ai": ".venv/bin/python ai_service/app.py",
     "build": "vite build",
+    "deploy:pages": "npx wrangler pages deploy ./dist --project-name=the-neural-report",
     "start": "node server/index.js",
     "test:ai": ".venv/bin/python -m unittest discover -s ai_service -p 'test_*.py'",
     "test": "node --test server/*.test.js && npm run test:ai",
