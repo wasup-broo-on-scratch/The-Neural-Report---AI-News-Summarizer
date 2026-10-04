@@ -1,11 +1,15 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { searchNews } from './news.js';
 
 const app = express();
 const port = Number(process.env.PORT || 8787);
 const pageSize = 12;
+const frontendDirectory = fileURLToPath(new URL('../dist/', import.meta.url));
 
 app.use(cors({
   origin: process.env.FRONTEND_ORIGIN ? process.env.FRONTEND_ORIGIN.split(',').map((origin) => origin.trim()) : true,
@@ -131,6 +135,14 @@ async function proxyAi(response, path, payload) {
   const timeoutMs = Number(process.env.OLLAMA_TIMEOUT_MS || 90000) + 5000;
   const result = await fetchAiService(path, payload, timeoutMs);
   response.status(result.status).json(result.data);
+}
+
+if (existsSync(path.join(frontendDirectory, 'index.html'))) {
+  app.use(express.static(frontendDirectory));
+  app.get('*', (request, response, next) => {
+    if (request.path.startsWith('/api/')) return next();
+    response.sendFile(path.join(frontendDirectory, 'index.html'));
+  });
 }
 
 app.listen(port, '0.0.0.0', () => {

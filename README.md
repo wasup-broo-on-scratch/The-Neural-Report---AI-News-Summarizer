@@ -39,6 +39,14 @@ Set `AI_SERVICE_URL`, `OLLAMA_URL`, and `OLLAMA_MODEL` in `.env`. Suggested qual
 
 ## Deployment
 
+### Wispbyte
+
+The Express service serves both the built React site and `/api/*`, so they can use one Wispbyte NodeJS app and one public URL. In Wispbyte, create a **NodeJS** app from this repository with root directory `/`, build command `npm run build`, and start command `npm start`. Wispbyte should install the `package.json` dependencies before the build. Use the platform-assigned port; the server reads `PORT` automatically. The frontend uses same-origin API requests, so `VITE_API_BASE_URL` can remain unset.
+
+For AI, create a second Wispbyte **Python** app from the same repository with root directory `ai_service`, install command `pip install -r requirements.txt`, and start command `gunicorn --bind 0.0.0.0:$PORT app:app`. Set `AI_SERVICE_URL` on the Node app to the Python app's reachable URL. Set `OLLAMA_URL` and `OLLAMA_MODEL` on the Python app.
+
+Ollama must also run as a persistent service reachable from the Python app. If Wispbyte offers a Docker/GPU server for your plan, the repository includes `compose.yaml` and `compose.gpu.yaml`; use the GPU override for fast 30B inference. The basic NodeJS/Python runtime options alone do not install or run Ollama. Check that the Wispbyte plan supports the required GPU memory and persistent storage before selecting `qwen3:30b`; otherwise AI summaries/chat will remain unavailable or too slow. Model weights are pulled once into persistent storage by the Compose setup.
+
 ### Cloudflare Pages frontend
 
 Build and deploy the static frontend from the repository root. Configure the Pages build command as `npm run build` and output directory as `dist`.
